@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from datetime import datetime
+
 from face_recognition import recognize_face
 
 
@@ -67,7 +68,6 @@ st.sidebar.info(
 
 attendance_file = "attendance.csv"
 
-
 try:
 
     attendance_df = pd.read_csv(
@@ -94,7 +94,6 @@ today = datetime.now().strftime(
     "%Y-%m-%d"
 )
 
-
 today_attendance = attendance_df[
     attendance_df["Date"] == today
 ]
@@ -106,24 +105,20 @@ today_attendance = attendance_df[
 
 col1, col2, col3 = st.columns(3)
 
-
 col1.metric(
     "👥 Total Attendance Today",
     len(today_attendance)
 )
-
 
 col2.metric(
     "📅 Today's Date",
     today
 )
 
-
 col3.metric(
     "🕐 Current Time",
     datetime.now().strftime("%H:%M:%S")
 )
-
 
 st.write("---")
 
@@ -149,11 +144,10 @@ with camera_col:
         "Take a photo for face recognition"
     )
 
-
     if camera_image is not None:
 
         # --------------------------------
-        # Convert uploaded camera image
+        # Convert camera image
         # to OpenCV format
         # --------------------------------
 
@@ -169,7 +163,6 @@ with camera_col:
             cv2.IMREAD_COLOR
         )
 
-
         if frame is None:
 
             st.error(
@@ -182,7 +175,7 @@ with camera_col:
             # Face recognition
             # --------------------------------
 
-            name, score = recognize_face(
+            frame, name, score = recognize_face(
                 frame
             )
 
@@ -213,9 +206,7 @@ with camera_col:
                     "%H:%M:%S"
                 )
 
-
                 already_present = False
-
 
                 if not attendance_df.empty:
 
@@ -232,6 +223,10 @@ with camera_col:
                     ).any()
 
 
+                # --------------------------------
+                # Mark attendance
+                # --------------------------------
+
                 if not already_present:
 
                     new_row = pd.DataFrame(
@@ -243,7 +238,6 @@ with camera_col:
                         }]
                     )
 
-
                     attendance_df = pd.concat(
                         [
                             attendance_df,
@@ -252,12 +246,10 @@ with camera_col:
                         ignore_index=True
                     )
 
-
                     attendance_df.to_csv(
                         attendance_file,
                         index=False
                     )
-
 
                     st.success(
                         f"✅ Attendance marked: "
@@ -283,7 +275,6 @@ with camera_col:
                 cv2.COLOR_BGR2RGB
             )
 
-
             st.image(
                 frame_rgb,
                 caption="Captured Image",
@@ -299,13 +290,15 @@ with attendance_col:
 
     st.subheader("📋 Today's Attendance")
 
+    today_attendance = attendance_df[
+        attendance_df["Date"] == today
+    ]
 
     if today_attendance.empty:
 
         st.info(
             "No attendance recorded today."
         )
-
 
     else:
 
@@ -324,11 +317,9 @@ with attendance_col:
         index=False
     ).encode("utf-8")
 
-
     st.download_button(
         label="📥 Download Attendance CSV",
         data=csv_data,
         file_name="attendance.csv",
         mime="text/csv"
     )
-

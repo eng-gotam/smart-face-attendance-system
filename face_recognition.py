@@ -83,35 +83,53 @@ for person, features in database.items():
 
 def recognize_face(frame):
 
+    # Resize frame
     frame = cv2.resize(
         frame,
         (640, 640)
     )
 
+    # Set detector input size
     face_detector.setInputSize(
         (640, 640)
     )
 
+    # Detect faces
     _, faces = face_detector.detect(
         frame
     )
+
+
+    # --------------------------------
+    # No face detected
+    # --------------------------------
 
     if faces is None:
 
         return frame, "No Face", 0.0
 
 
+    # --------------------------------
+    # Default recognition result
+    # --------------------------------
+
     best_person = "Unknown"
     best_score = -1.0
 
 
+    # --------------------------------
+    # Process every detected face
+    # --------------------------------
+
     for face in faces:
 
+        # Align face
         aligned_face = face_recognizer.alignCrop(
             frame,
             face
         )
 
+        # Extract face feature
         feature = face_recognizer.feature(
             aligned_face
         )
@@ -123,7 +141,7 @@ def recognize_face(frame):
 
 
         # --------------------------------
-        # Compare with database
+        # Compare with face database
         # --------------------------------
 
         current_person = "Unknown"
@@ -147,6 +165,7 @@ def recognize_face(frame):
                 )
 
 
+                # Keep highest similarity
                 if score > current_score:
 
                     current_score = score
@@ -154,7 +173,7 @@ def recognize_face(frame):
 
 
         # --------------------------------
-        # Threshold
+        # Recognition threshold
         # --------------------------------
 
         THRESHOLD = 0.60
@@ -172,10 +191,11 @@ def recognize_face(frame):
 
 
         # --------------------------------
-        # Draw face
+        # Draw bounding box
         # --------------------------------
 
         x, y, w, h = face[:4].astype(int)
+
 
         cv2.rectangle(
             frame,
@@ -186,10 +206,14 @@ def recognize_face(frame):
         )
 
 
+        # --------------------------------
+        # Draw recognition result
+        # --------------------------------
+
         cv2.putText(
             frame,
             f"{best_person} ({best_score:.2f})",
-            (x, y - 10),
+            (x, max(y - 10, 20)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
             (0, 255, 0),
@@ -197,4 +221,10 @@ def recognize_face(frame):
         )
 
 
+    # --------------------------------
+    # Return processed frame
+    # --------------------------------
+
     return frame, best_person, best_score
+
+    
