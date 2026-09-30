@@ -30,13 +30,6 @@ st.markdown(
         font-weight: bold;
     }
 
-    .status-box {
-        padding: 15px;
-        border-radius: 10px;
-        background-color: #f0f2f6;
-        margin-bottom: 10px;
-    }
-
     </style>
     """,
     unsafe_allow_html=True
@@ -70,20 +63,16 @@ start_camera = st.sidebar.checkbox(
 st.sidebar.write("---")
 
 st.sidebar.info(
-    "Recognition is powered by "
-    "OpenCV YuNet + SFace."
+    "Recognition is powered by OpenCV YuNet + SFace."
 )
 
 
 # --------------------------------
-# Dashboard statistics
+# Attendance file
 # --------------------------------
 
-col1, col2, col3 = st.columns(3)
-
-
-# Load attendance
 attendance_file = "attendance.csv"
+
 
 try:
 
@@ -103,6 +92,10 @@ except:
     )
 
 
+# --------------------------------
+# Today's date
+# --------------------------------
+
 today = datetime.now().strftime(
     "%Y-%m-%d"
 )
@@ -111,6 +104,13 @@ today = datetime.now().strftime(
 today_attendance = attendance_df[
     attendance_df["Date"] == today
 ]
+
+
+# --------------------------------
+# Dashboard statistics
+# --------------------------------
+
+col1, col2, col3 = st.columns(3)
 
 
 col1.metric(
@@ -160,6 +160,7 @@ with camera_col:
 
         cap = cv2.VideoCapture(0)
 
+
         if not cap.isOpened():
 
             st.error(
@@ -168,9 +169,10 @@ with camera_col:
 
         else:
 
-            while start_camera:
+            while True:
 
                 ret, frame = cap.read()
+
 
                 if not ret:
 
@@ -181,8 +183,11 @@ with camera_col:
                     break
 
 
-                # Recognize faces
-                processed_frame, results = recognize_face(
+                # --------------------------------
+                # Recognize face
+                # --------------------------------
+
+                name, score = recognize_face(
                     frame
                 )
 
@@ -191,86 +196,94 @@ with camera_col:
                 # Attendance
                 # --------------------------------
 
-                for result in results:
+                if name == "No Face":
 
-                    name = result["name"]
-                    score = result["score"]
+                    status_placeholder.warning(
+                        "⚠️ No face detected."
+                    )
 
 
-                    if name != "Unknown":
+                elif name == "Unknown":
 
-                        today = datetime.now().strftime(
-                            "%Y-%m-%d"
+                    status_placeholder.warning(
+                        f"⚠️ Unknown person "
+                        f"({score:.2f})"
+                    )
+
+
+                else:
+
+                    current_time = datetime.now().strftime(
+                        "%H:%M:%S"
+                    )
+
+
+                    already_present = False
+
+
+                    if not attendance_df.empty:
+
+                        already_present = (
+                            (
+                                attendance_df["Name"]
+                                == name
+                            )
+                            &
+                            (
+                                attendance_df["Date"]
+                                == today
+                            )
+                        ).any()
+
+
+                    if not already_present:
+
+                        new_row = pd.DataFrame(
+                            [{
+                                "Name": name,
+                                "Date": today,
+                                "Time": current_time,
+                                "Status": "Present"
+                            }]
                         )
 
-                        current_time = datetime.now().strftime(
-                            "%H:%M:%S"
+
+                        attendance_df = pd.concat(
+                            [
+                                attendance_df,
+                                new_row
+                            ],
+                            ignore_index=True
                         )
 
 
-                        # Check duplicate attendance
-                        already_present = False
-
-                        if not attendance_df.empty:
-
-                            already_present = (
-                                (
-                                    attendance_df["Name"] == name
-                                )
-                                &
-                                (
-                                    attendance_df["Date"] == today
-                                )
-                            ).any()
+                        attendance_df.to_csv(
+                            attendance_file,
+                            index=False
+                        )
 
 
-                        if not already_present:
+                        status_placeholder.success(
+                            f"✅ Attendance marked: "
+                            f"{name} "
+                            f"({score:.2f})"
+                        )
 
-                            new_row = pd.DataFrame(
-                                [{
-                                    "Name": name,
-                                    "Date": today,
-                                    "Time": current_time,
-                                    "Status": "Present"
-                                }]
-                            )
-
-
-                            attendance_df = pd.concat(
-                                [
-                                    attendance_df,
-                                    new_row
-                                ],
-                                ignore_index=True
-                            )
-
-
-                            attendance_df.to_csv(
-                                attendance_file,
-                                index=False
-                            )
-
-
-                            status_placeholder.success(
-                                f"✅ Attendance marked: {name}"
-                            )
-
-                        else:
-
-                            status_placeholder.info(
-                                f"👤 {name} already marked present today."
-                            )
 
                     else:
 
-                        status_placeholder.warning(
-                            "⚠️ Unknown person detected."
+                        status_placeholder.info(
+                            f"👤 {name} "
+                            f"already marked present today."
                         )
 
 
-                # Convert BGR → RGB
+                # --------------------------------
+                # Display result
+                # --------------------------------
+
                 frame_rgb = cv2.cvtColor(
-                    processed_frame,
+                    frame,
                     cv2.COLOR_BGR2RGB
                 )
 
@@ -278,16 +291,18 @@ with camera_col:
                 camera_placeholder.image(
                     frame_rgb,
                     channels="RGB",
-                    use_container_width=True
+                    width="stretch"
                 )
 
 
             cap.release()
 
+
     else:
 
         camera_placeholder.info(
-            "Enable **Start Camera** from the sidebar."
+            "Enable **Start Camera** "
+            "from the sidebar."
         )
 
 
@@ -306,11 +321,12 @@ with attendance_col:
             "No attendance recorded today."
         )
 
+
     else:
 
         st.dataframe(
             today_attendance,
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
 
@@ -330,3 +346,5 @@ with attendance_col:
         file_name="attendance.csv",
         mime="text/csv"
     )
+
+
