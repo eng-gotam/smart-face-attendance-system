@@ -129,3 +129,4 @@ BS Artificial Intelligence Student
 Sindh Madressatul Islam University, Karachi
 
 GitHub: https://github.com/eng-gotam
+Live APP: https://smart-face-attendance-system-fbmmztts7hnrq2yvfn5hpx.streamlit.app/
