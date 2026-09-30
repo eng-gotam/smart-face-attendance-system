@@ -1,0 +1,32 @@
+```text
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Face database / biometric data
+face_database.pkl
+
+# Attendance records
+attendance.csv
+
+# Real face images
+gotam/
+pardeep/
+lalit/
+sumair/
+narejo/
+sangi/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
