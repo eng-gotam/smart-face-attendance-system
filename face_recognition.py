@@ -1,17 +1,9 @@
 import cv2
 import pickle
 import os
+import base64
 import numpy as np
-
-
-# --------------------------------
-# Model paths
-# --------------------------------
-
-FACE_DETECTOR_MODEL = "models/face_detection_yunet_2023mar.onnx"
-FACE_RECOGNIZER_MODEL = "models/face_recognition_sface_2021dec.onnx"
-
-DATABASE_FILE = "face_database.pkl"
+import streamlit as st
 
 
 # --------------------------------
@@ -19,47 +11,80 @@ DATABASE_FILE = "face_database.pkl"
 # --------------------------------
 
 face_detector = cv2.FaceDetectorYN.create(
-    FACE_DETECTOR_MODEL,
+    "models/face_detection_yunet_2023mar.onnx",
     "",
     (640, 640)
 )
 
 face_recognizer = cv2.FaceRecognizerSF.create(
-    FACE_RECOGNIZER_MODEL,
+    "models/face_recognition_sface_2021dec.onnx",
     ""
 )
 
 
 # --------------------------------
-# Load database safely
+# Load face database
 # --------------------------------
 
-database = {}
+def load_face_database():
 
-if os.path.exists(DATABASE_FILE):
+    # Local development
+    if os.path.exists("face_database.pkl"):
 
-    with open(DATABASE_FILE, "rb") as file:
-        database = pickle.load(file)
+        with open("face_database.pkl", "rb") as file:
+            database = pickle.load(file)
 
-    print("Face database loaded.")
+        print("Face database loaded from local file.")
 
-else:
+        return database
+
+
+    # Streamlit Cloud
+    if "FACE_DATABASE" in st.secrets:
+
+        encoded_database = st.secrets["FACE_DATABASE"]
+
+        database_bytes = base64.b64decode(
+            encoded_database
+        )
+
+        database = pickle.loads(
+            database_bytes
+        )
+
+        print("Face database loaded from Streamlit Secrets.")
+
+        return database
+
 
     print("Face database not found.")
-    print("Please register faces before recognition.")
+
+    return {}
+
+
+database = load_face_database()
+
+
+print("Face database loaded.")
+
+for person, features in database.items():
+
+    print(
+        person,
+        "->",
+        len(features),
+        "features"
+    )
 
 
 # --------------------------------
-# Recognize face
+# Recognition function
 # --------------------------------
 
-def recognize_face(image):
+def recognize_face(frame):
 
-    if not database:
-        return "Unknown", 0.0
-
-    image = cv2.resize(
-        image,
+    frame = cv2.resize(
+        frame,
         (640, 640)
     )
 
@@ -68,19 +93,22 @@ def recognize_face(image):
     )
 
     _, faces = face_detector.detect(
-        image
+        frame
     )
 
     if faces is None:
-        return "No Face", 0.0
+
+        return frame, "No Face", 0.0
+
 
     best_person = "Unknown"
-    best_score = -1
+    best_score = -1.0
+
 
     for face in faces:
 
         aligned_face = face_recognizer.alignCrop(
-            image,
+            frame,
             face
         )
 
@@ -93,6 +121,15 @@ def recognize_face(image):
             dtype=np.float32
         ).reshape(1, -1)
 
+
+        # --------------------------------
+        # Compare with database
+        # --------------------------------
+
+        current_person = "Unknown"
+        current_score = -1.0
+
+
         for person, stored_features in database.items():
 
             for stored_feature in stored_features:
@@ -102,26 +139,62 @@ def recognize_face(image):
                     dtype=np.float32
                 ).reshape(1, -1)
 
+
                 score = face_recognizer.match(
                     feature,
                     stored_feature,
                     cv2.FaceRecognizerSF_FR_COSINE
                 )
 
-                if score > best_score:
 
-                    best_score = score
-                    best_person = person
+                if score > current_score:
+
+                    current_score = score
+                    current_person = person
 
 
-    # --------------------------------
-    # Recognition threshold
-    # --------------------------------
+        # --------------------------------
+        # Threshold
+        # --------------------------------
 
-    THRESHOLD = 0.60
+        THRESHOLD = 0.60
 
-    if best_score >= THRESHOLD:
 
-        return best_person, best_score
+        if current_score >= THRESHOLD:
 
-    return "Unknown", best_score
+            best_person = current_person
+            best_score = current_score
+
+        else:
+
+            best_person = "Unknown"
+            best_score = current_score
+
+
+        # --------------------------------
+        # Draw face
+        # --------------------------------
+
+        x, y, w, h = face[:4].astype(int)
+
+        cv2.rectangle(
+            frame,
+            (x, y),
+            (x + w, y + h),
+            (0, 255, 0),
+            2
+        )
+
+
+        cv2.putText(
+            frame,
+            f"{best_person} ({best_score:.2f})",
+            (x, y - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2
+        )
+
+
+    return frame, best_person, best_score
